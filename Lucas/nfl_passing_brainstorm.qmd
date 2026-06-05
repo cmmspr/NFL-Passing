@@ -5,3 +5,38 @@ editor: visual
 ---
 
 nfl passing
+
+Question 1.
+
+What is the successful position, route, and location to throw to for a 4th down conversion?
+
+Question 2.
+
+What makes the chiefs so successful at passing? What makes the Bears so bad?
+
+-   efficiency is defined by
+
+```{r}
+library(tidyverse)
+
+nfl_passes <- read_csv("https://raw.githubusercontent.com/36-SURE/2026/main/data/nfl_passes.csv")
+
+library(readr)
+
+positions <- read_csv("/Users/kendalllucas/Documents/CMSACamp/NFL-Passing/players.csv")
+positions <- positions |>
+  select(Position, displayName)
+
+#result <- left_join(df1, df2, by = join_by(id_left == id_right))
+
+result <- left_join(nfl_passes, positions, by = join_by("target_player_name" == "displayName"), relationship = "many-to-many")
+
+result |>
+  filter(down == 4 & (Position == "RB" | Position == "TE" | Position == "WR")) |>
+  group_by(Position, route_ran) |>
+  summarise(completion_percentage = mean(complete_pass)) |>
+  ggplot(aes(x = route_ran, y = completion_percentage) +
+  geom_col() +
+  facet_wrap(~Position) +
+  coord_flip()
+```
