@@ -11,9 +11,11 @@ editor: visual
 
 ## *Question Ideas:*
 
-- Most successful play on fourth down in overtime
+- What's the successful play on fourth down?
 
-- Relationship between yards after catch & route ran for complete passes, using location of target (x and y coordinates), cluster by position
+- Clustering yards after catch & route ran for complete passes, using location of target (x and y coordinates)
+
+- Which team is most successful at converting on fourth down?
 
 ```{r}
 library(tidyverse)
@@ -53,4 +55,21 @@ route_outcomes |>
   geom_col() +
   facet_wrap(~Position) +
   coord_flip()
+```
+
+```{r}
+nfl_passes |>
+  filter(down == 4) |>
+  ggplot(aes(x = target_x, target_y, color = complete_pass)) +
+  geom_point()
+  
+
+```
+
+```{r}
+nfl_passes |>
+  filter(down == 4) |>
+  group_by(posteam, route_ran) |>
+  count()
+
 ```
