@@ -35,7 +35,7 @@ result |>
   filter(down == 4 & (Position == "RB" | Position == "TE" | Position == "WR")) |>
   group_by(Position, route_ran) |>
   summarise(completion_percentage = mean(complete_pass)) |>
-  ggplot(aes(x = route_ran, y = completion_percentage) +
+  ggplot(aes(x = route_ran, y = completion_percentage)) +
   geom_col() +
   facet_wrap(~Position) +
   coord_flip()
