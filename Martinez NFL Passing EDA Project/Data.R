@@ -102,3 +102,29 @@ team_tendencies <- fourth_down %>%
 
 team_tendencies
 
+team_success <- fourth_down %>%
+	filter(play_type %in% c("run", "pass")) %>%
+	group_by(posteam) %>%
+	summarize(
+		attempts = n(),
+		conversions = sum(first_down == 1, na.rm = TRUE),
+		conversion_rate = conversions / attempts,
+		avg_epa = mean(epa, na.rm = TRUE)
+	) %>%
+	arrange(desc(conversion_rate))
+
+team_success
+
+library(ggplot2)
+
+ggplot(team_tendencies, aes(x = reorder(posteam, go_rate), y = go_rate)) +
+	geom_col(fill = "darkred") +
+	coord_flip() +
+	labs(
+		title = "2022 4th-Down Go-For-It Rate by Team",
+		x = "Team",
+		y = "Go-For-It Rate"
+	) +
+	scale_y_continuous(labels = scales::percent_format()) +
+	theme_minimal()
+
