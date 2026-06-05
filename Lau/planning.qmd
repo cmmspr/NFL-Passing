@@ -11,11 +11,9 @@ editor: visual
 
 ## *Question Ideas:*
 
-- Relationship between yards after catch & route ran for each receiver position
-
 - Most successful play on fourth down in overtime
 
-- 
+- Relationship between yards after catch & route ran for complete passes, using location of target (x and y coordinates), cluster by position
 
 ```{r}
 library(tidyverse)
@@ -24,14 +22,35 @@ nfl_passes <- read_csv("https://raw.githubusercontent.com/36-SURE/2026/main/data
 ```
 
 ```{r}
+# Selecting player position from dataset
+players <- players |>
+  select(displayName, Position) |>
+  arrange(displayName)
 
+# Joins nfl_passes and players dataset to add position of target receivers
+data_set <- left_join(nfl_passes, players, by = join_by("target_player_name" == "displayName"))
 
 ```
 
-**Work Breakdown:**
+```{r}
+# Generating dataset with completed passes during fourth down routes
+route_outcomes <- data_set |>
+  filter(!is.na(Position),
+         complete_pass == 1,
+         Position %in% c("RB", "TE", "WR"),
+         down == "4") |>
+  group_by(route_ran, Position) |>
+  summarise(avg_yards_after_catch = mean(yards_after_catch), avg_air_yards = mean(air_yards), avg_total_yards = mean(yards_gained))
 
-Carla -
+# Display dataset
+route_outcomes
+```
 
-Jenna -
-
-Kendall -
+```{r}
+# Generates graph to illustrate total yards during fourth down completions based on different routes and positions
+route_outcomes |>
+  ggplot(aes(x = route_ran, y = avg_total_yards)) +
+  geom_col() +
+  facet_wrap(~Position) +
+  coord_flip()
+```
