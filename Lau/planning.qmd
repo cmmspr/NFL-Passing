@@ -38,11 +38,11 @@ data_set <- left_join(nfl_passes, players, by = join_by("target_player_name" == 
 # Generating dataset with completed passes during fourth down routes
 route_outcomes <- data_set |>
   filter(!is.na(Position),
-         complete_pass == 1,
          Position %in% c("RB", "TE", "WR"),
-         down == "4") |>
+         down == "4"
+         ) |>
   group_by(route_ran, Position) |>
-  summarise(avg_yards_after_catch = mean(yards_after_catch), avg_air_yards = mean(air_yards), avg_total_yards = mean(yards_gained))
+  summarise(avg_yards_after_catch = mean(yards_after_catch), avg_air_yards = mean(air_yards), avg_total_yards = mean(yards_gained), completed_pass_perc = mean(complete_pass))
 
 # Display dataset
 route_outcomes
@@ -51,25 +51,41 @@ route_outcomes
 ```{r}
 # Generates graph to illustrate total yards during fourth down completions based on different routes and positions
 route_outcomes |>
-  ggplot(aes(x = route_ran, y = avg_total_yards)) +
+  mutate(expected_yards = avg_total_yards * completed_pass_perc) |>
+  ggplot(aes(x = route_ran, y = expected_yards)) +
   geom_col() +
   facet_wrap(~Position) +
-  coord_flip()
+  coord_flip() +
+
 ```
 
 ```{r}
 nfl_passes |>
-  filter(down == 4) |>
+  filter(down == 4, !is.na(route_ran)) |>
   ggplot(aes(x = target_x, target_y, color = complete_pass)) +
-  geom_point()
+  geom_point() +
+  facet_wrap(~route_ran) +
+  theme()
   
 
 ```
 
 ```{r}
 nfl_passes |>
-  filter(down == 4) |>
   group_by(posteam, route_ran) |>
-  count()
+  summarise(avg_yards = mean(yards_gained)) |>
+  ggplot(aes(x = route_ran, y = avg_yards)) +
+  geom_col() +
+  facet_wrap(~posteam) +
+  coord_flip()
+
+nfl_passes |>
+  filter(posteam %in% c("KC", "CHI")) |>
+  group_by(posteam, route_ran) |>
+  summarise(avg_yards = mean(yards_gained), completed_pass_perc = mean(complete_pass), expected_yards = avg_yards * completed_pass_perc) |>
+  ggplot(aes(x = route_ran, y = expected_yards)) +
+  geom_col() +
+  facet_wrap(~posteam) +
+  coord_flip()
 
 ```
