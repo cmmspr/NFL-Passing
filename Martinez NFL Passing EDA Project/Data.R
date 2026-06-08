@@ -16,14 +16,8 @@ library(nflreadr)
 library(nflfastR)
 library(nflverse)
 
-# -----------------------------
-# 1. Load play-by-play data
-# -----------------------------
 pbp_2022 <- load_pbp(2022)
 
-# -----------------------------
-# 2. Basic league summary
-# -----------------------------
 league_summary <- pbp_2022 %>%
 	summarize(
 		total_plays = n(),
@@ -57,10 +51,8 @@ library(ggthemes)
 library(tidyverse)
 library(nflfastR)
 
-# Load 2022 play-by-play
 pbp_2022 <- load_pbp(2022)
 
-# Filter to 4th-down plays
 fourth_down <- pbp_2022 %>%
 	filter(down == 4)
 
@@ -188,3 +180,40 @@ ggplot(team_4th_pass_tendencies, aes(x = reorder(posteam, pass_rate), y = pass_r
 
 install.packages("sportyR")
 library(sportyR)
+
+library(tidyverse)
+library(nflfastR)
+library(sportyR)
+
+fourth_passes <- pbp_2022 %>%
+	filter(down == 4, pass == 1, !is.na(air_yards), !is.na(pass_location))
+
+fourth_passes %>%
+	mutate(depth_bucket = case_when(
+		air_yards <= 0 ~ "Behind LOS",
+		air_yards <= 5 ~ "Short (0–5)",
+		air_yards <= 10 ~ "Intermediate (6–10)",
+		TRUE ~ "Deep (10+)"
+	)) %>%
+	group_by(depth_bucket) %>%
+	summarize(
+		attempts = n(),
+		conversion_rate = mean(first_down == 1, na.rm = TRUE)
+	) %>%
+	arrange(desc(conversion_rate))
+
+fourth_passes %>%
+	group_by(pass_location) %>%
+	summarize(
+		attempts = n(),
+		conversion_rate = mean(first_down == 1, na.rm = TRUE)
+	) %>%
+	arrange(desc(conversion_rate))
+
+fourth_passes %>%
+	mutate(at_sticks = air_yards >= ydstogo - 1 & air_yards <= ydstogo + 2) %>%
+	group_by(at_sticks) %>%
+	summarize(
+		attempts = n(),
+		conversion_rate = mean(first_down == 1, na.rm = TRUE)
+	)
