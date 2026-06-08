@@ -217,3 +217,21 @@ fourth_passes %>%
 		attempts = n(),
 		conversion_rate = mean(first_down == 1, na.rm = TRUE)
 	)
+
+fourth_passes <- pbp_2022 %>%
+	filter(down == 4, pass == 1) %>%
+	mutate(
+		success = if_else(first_down == 1, "Success", "Failure")
+	)
+
+ggplot(fourth_passes, aes(x = air_yards, y = pass_location, color = success)) +
+	geom_jitter(alpha = 0.7, size = 2.5, height = 0.15) +
+	scale_color_manual(values = c("Success" = "green3", "Failure" = "red3")) +
+	labs(
+		title = "4th Down Passing: Success vs Failure (2022)",
+		subtitle = "Depth of target (air_yards) vs horizontal location (left/middle/right)",
+		x = "Air Yards (Depth of Throw)",
+		y = "Pass Location",
+		color = "Outcome"
+	) +
+	theme_minimal()
