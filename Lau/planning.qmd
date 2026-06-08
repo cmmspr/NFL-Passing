@@ -5,10 +5,6 @@ format: html
 editor: visual
 ---
 
-```{r}
-
-```
-
 ## *Data tidying:*
 
 - Join receivers with players.csv to attach player position
@@ -158,11 +154,43 @@ test |>
 ```
 
 ```{r}
+library(nflreadr)
+library(ggimage)
+library(teamcolors)
+
+player_headshots <- nflreadr::load_rosters(seasons = 2022) 
+player_headshots <- player_headshots|>
+  select(position, full_name, headshot_url)
+
+result <- nfl_passes |>
+  left_join(player_headshots, by = join_by("target_player_name" == "full_name"), relationship = "many-to-many")
+
+test <- result |>
+  group_by(passer_player_name, target_player_name, receiver_headshot = headshot_url, posteam) |>
+  summarise(times_targeted = n(), 
+            total_yards = sum(yards_gained), 
+            yards_per_target = total_yards/times_targeted, 
+            .groups = "drop") |>
+  arrange(desc(total_yards)) |>
+  filter(times_targeted >= 5) |>
+  head(10)
+
+test |>
+  ggplot(aes(x = times_targeted, y = total_yards)) +
+  geom_image(aes(image = receiver_headshot), size = 0.2) 
+
+test2 <- test |>
+  ggplot(aes(x = reorder(target_player_name, total_yards), y = total_yards, fill = posteam)) +
+  geom_col(width = 0.52) +
+  geom_image(aes(image = receiver_headshot), size = 0.16) +
+  coord_flip() +
+  theme_classic()
+
 quarterbacks <- player_headshots |>
   mutate(full_name = str_replace(full_name, "^(\\w)\\w*\\s+", "\\1.")) |>
   select(full_name, qb_headshot = headshot_url)
 
-top_duos <- df |>
+top_duos <- result |>
   left_join(quarterbacks, by = join_by("passer_player_name" == "full_name"), relationship = "many-to-many") |>
   group_by(passer_player_name, 
            target_player_name, 
@@ -177,14 +205,52 @@ top_duos <- df |>
   arrange(desc(total_yards))|>
   head(10)
 
+teamcolors <- c(
+  "LA" = "#0C2BE9",
+  "MIN" = "#4f2683",
+  "MIA" = "#10b8bd",
+  "BUF" = "#0d48a2",
+  "KC" = "#e31837",
+  "PHI" = "#004C54",
+  "TB" = "#c60c30",
+  "JAX" = "#006778",
+  "CIN" = "#fb4f14",
+  "CLE" = "#7c4700",
+  "LV" = "grey")
+
 top_duos |>
-  ggplot(aes(x = reorder(target_player_name, total_yards), 
+  mutate(target_player_name = str_replace(target_player_name, "^(\\w)\\w*\\s+", "\\1."), duo = paste(passer_player_name, target_player_name, sep = " & ")) |>
+  ggplot(aes(x = reorder(duo, total_yards), 
              y = total_yards, 
              fill = posteam)) +
-  geom_col(width = 0.52) +
-  geom_image(aes(image = receiver_headshot), size = 0.16) +
-  geom_image(aes(y = 0, image = qb_headshot), size = 0.16) +
+  geom_col(width = 0.6) +
+  geom_image(aes(image = receiver_headshot), 
+             size = 0.16) +
+  geom_image(aes(y = 0, image = qb_headshot), 
+             size = 0.16) +
+  geom_text(aes(label = duo),
+            family = "mono",
+            fontface = "bold", 
+            y = 35, 
+            color = "white", 
+            hjust = 0) +
+  geom_text(aes(label = total_yards),
+            family = "mono",
+            fontface = "bold",
+            color = "white",
+            hjust = 2) +
   scale_y_continuous(breaks = seq(0, 1000, by = 200)) +
   coord_flip() +
-  theme_classic()
+  scale_fill_manual(values = teamcolors) +
+  labs(title = "Top Passing Duos in the NFL",
+       subtitle = "From the 2022 Season",
+       y = "Total Yards",
+       x = "") +
+  theme_classic() +
+  theme(legend.position = "none",
+        plot.title = element_text(size = 28, family = "mono"),
+        plot.subtitle = element_text(size = 17, family = "mono"),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank())
+
 ```
