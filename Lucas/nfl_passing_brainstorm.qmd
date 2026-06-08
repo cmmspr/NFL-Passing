@@ -42,3 +42,14 @@ result |>
 ```
 
 #hello
+
+```{r}
+result |>
+  filter(posteam == "KC" | posteam == "CHI") |>
+  ggplot(aes(x = posteam)) +
+  geom_bar()
+```
+
+Reasons Kansas is Good and Chi is Bad
+
+-   
