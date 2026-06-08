@@ -48,15 +48,16 @@ library(teamcolors)
 
 teamcolors <- c(
   "LA" = "#00338D",
-  "MIN" = "#4F2683",
+  "MIN" = "#4f2683",
   "MIA" = "#008e97",
   "BUF" = "#00338D",
-  "KC" = "#E31837",
+  "KC" = "#e31837",
   "PHI" = "#004C54",
-  "TB" = "#D50A0A",
+  "TB" = "#c60c30",
   "JAX" = "#006778",
-  "CIN" = "#FB4F14",
-  "CLE" = "#311D00")
+  "CIN" = "#fb4f14",
+  "CLE" = "#7c4700",
+  "LV" = "grey")
 
 result |>
   mutate(duo = paste(passer_player_name, target_player_name, sep = " & ")) |>
