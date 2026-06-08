@@ -74,14 +74,27 @@ route_outcomes |>
 ```
 
 ```{r}
-nfl_passes |>
+library(sportyR)
+football_field <- geom_football(league = "NFL", display_range = "in_bounds_only", rotation = 270)
+
+fourth_downs <- nfl_passes |>
   filter(down == 4, !is.na(route_ran)) |>
-  ggplot(aes(x = target_x, target_y, color = complete_pass)) +
-  geom_point() +
-  scale_color_manual(values = complete_pass, ) +
+  group_by(route_ran) |>
+  mutate(attempt = n()) |>
+  filter(attempt > 10) |>
+  ungroup() 
+
+football_field + 
+  geom_point(data = fourth_downs, 
+             aes(x = target_y -26.65, y = target_x - 60, color = factor(complete_pass))) + 
   facet_wrap(~route_ran) +
-  theme()
-  
+  scale_color_manual(
+    values = c("0" = "#D9381E", "1" = "lightgreen"), 
+    labels = c("0" = "Incomplete", "1" = "Complete"),
+    name = "Pass Outcome"
+  ) +
+  theme_classic()
+
 ```
 
 ```{r}
