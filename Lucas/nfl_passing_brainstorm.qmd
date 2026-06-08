@@ -12,9 +12,7 @@ What is the successful position, route, and location to throw to for a 4th down 
 
 Question 2.
 
-What makes the chiefs so successful at passing? What makes the Bears so bad?
-
--   efficiency is defined by
+Top ranked passer/reciever duo
 
 ```{r}
 library(tidyverse)
@@ -44,10 +42,37 @@ result |>
 #hello
 
 ```{r}
+install.packages("teamcolors")
+library(teamcolors)
+
+
+teamcolors <- c(
+  "LA" = "#00338D",
+  "MIN" = "#4F2683",
+  "MIA" = "#008e97",
+  "BUF" = "#00338D",
+  "KC" = "#E31837",
+  "PHI" = "#004C54",
+  "TB" = "#D50A0A",
+  "JAX" = "#006778",
+  "CIN" = "#FB4F14",
+  "CLE" = "#311D00")
+
 result |>
-  filter(posteam == "KC" | posteam == "CHI") |>
-  ggplot(aes(x = posteam)) +
-  geom_bar()
+  mutate(duo = paste(passer_player_name, target_player_name, sep = " & ")) |>
+  group_by(duo, posteam) |>
+  summarise(yards = sum(yards_gained), .groups = "drop") |>
+  arrange(desc(yards)) |>
+  head(n = 15) |>
+  ggplot(aes(x = reorder(duo, yards), y = yards, fill = posteam)) +
+  geom_col() +
+  coord_flip() +
+  theme_light() + 
+  scale_y_continuous(breaks = seq(0, 1000, 100)) +
+  scale_fill_manual(values = teamcolors)
+
+
+#Rams, Vikings, Dolphins, Bills, Cheifs, Ealges, Bucs, Jags, Bengals, Browns
 ```
 
 Reasons Kansas is Good and Chi is Bad
