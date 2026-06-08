@@ -128,3 +128,63 @@ ggplot(team_tendencies, aes(x = reorder(posteam, go_rate), y = go_rate)) +
 	scale_y_continuous(labels = scales::percent_format()) +
 	theme_minimal()
 
+library(tidyverse)
+library(nflfastR)
+
+pbp_2022 <- load_pbp(2022)
+
+# Filter to 4th-down plays
+fourth_down <- pbp_2022 %>%
+	filter(down == 4)
+
+league_4th_pass <- fourth_down %>%
+	filter(pass == 1) %>%
+	summarize(
+		total_4th_passes = n(),
+		conversion_rate = mean(first_down == 1, na.rm = TRUE),
+		avg_epa = mean(epa, na.rm = TRUE)
+	)
+
+league_4th_pass
+
+team_4th_pass_tendencies <- fourth_down %>%
+	filter(!is.na(posteam)) %>%
+	group_by(posteam) %>%
+	summarize(
+		total_4th = n(),
+		pass_4th = sum(pass == 1, na.rm = TRUE),
+		run_4th = sum(rush == 1, na.rm = TRUE),
+		pass_rate = pass_4th / total_4th
+	) %>%
+	arrange(desc(pass_rate))
+
+team_4th_pass_tendencies
+
+team_4th_pass_success <- fourth_down %>%
+	filter(pass == 1) %>%
+	group_by(posteam) %>%
+	summarize(
+		attempts = n(),
+		conversions = sum(first_down == 1, na.rm = TRUE),
+		conversion_rate = conversions / attempts,
+		avg_epa = mean(epa, na.rm = TRUE)
+	) %>%
+	arrange(desc(conversion_rate))
+
+team_4th_pass_success
+
+library(ggplot2)
+
+ggplot(team_4th_pass_tendencies, aes(x = reorder(posteam, pass_rate), y = pass_rate)) +
+	geom_col(fill = "steelblue") +
+	coord_flip() +
+	labs(
+		title = "2022 4th-Down Pass Rate by Team",
+		x = "Team",
+		y = "Pass Rate"
+	) +
+	scale_y_continuous(labels = scales::percent_format()) +
+	theme_minimal()
+
+install.packages("sportyR")
+library(sportyR)
