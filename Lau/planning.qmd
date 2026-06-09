@@ -15,7 +15,7 @@ editor: visual
 
 1.  What's the most successful play on fourth down?
 
-    *Variables - Total Yards, Completion Percentage, Route Ran, Huddle/No Huddle, Offense Formation, Motion Since Lineset*
+    *Variables - Total Yards, Completion Percentage, Route Ran, Huddle/No Huddle, Offense Formation, Motion Since Lineset, Time to Throw*
 
 2.  Who were the top passing/receiving duos?
 
@@ -134,7 +134,77 @@ football_field +
 
 ```{r}
 # Clustering
+fourth_down_features <- df |>
+  mutate(no_huddle = as.numeric(no_huddle),
+         complete_pass = as.numeric(complete_pass),
+         qtr = as.numeric(qtr),
+         offense_formation = as.factor(offense_formation)) |>
+  select(yards_gained, 
+         no_huddle, 
+         qtr, 
+         time_to_throw,
+         complete_pass, 
+         ) |> 
+  drop_na() 
 
+std_fourth_down_features <- fourth_down_features |> 
+  scale(center = TRUE, scale = TRUE)
+
+set.seed(47)
+kmeans_many_features <- fourth_down_features |> 
+  kmeans(algorithm = "Hartigan-Wong", centers = 4, nstart = 30) 
+```
+
+```{r}
+# Clustering time_to_throw and yards_gained, standardized
+set.seed(47)
+
+clean_football_features <- fourth_downs |>
+  filter(complete_pass == 1) |>
+  mutate(std_time_to_throw = as.numeric(scale(time_to_throw, center = TRUE, scale = TRUE)), 
+         std_yards_gained = as.numeric(scale(yards_gained, center = TRUE, scale = TRUE)))
+
+std_kmeans <- clean_football_features |> 
+  select(std_time_to_throw, std_yards_gained) |> 
+  kmeans(algorithm = "Lloyd", centers = 4, nstart = 30, iter.max = 50)
+
+clean_football_features |>
+  mutate(
+    team_clusters = as.factor(std_kmeans$cluster)
+  ) |>
+  ggplot(aes(x = std_time_to_throw, y = std_yards_gained,
+             color = team_clusters)) +
+  geom_point(size = 2) + 
+  ggthemes::scale_color_colorblind() +
+  theme(legend.position = "bottom") +
+  coord_fixed() +
+  facet_wrap(~route_ran)
+
+
+fourth_downs |>
+  filter(complete_pass ==1) |>
+  summarise(mean(yards_gained))
+```
+
+```{r}
+# Clustering
+init_kmeans <- fourth_downs |>
+  filter(complete_pass == 1) |>
+  select(time_to_throw, yards_gained) |>
+  kmeans(algorithm = "Lloyd", centers = 4,
+         nstart = 30, iter.max = 50)
+
+# Not standardized, causes kills per set to impact more than blocks per set
+fourth_downs |>
+  filter(complete_pass == 1) |>
+  mutate(team_clusters = as.factor(init_kmeans$cluster)) |>
+  ggplot(aes(x = time_to_throw, y = yards_gained,
+             color = team_clusters)) +
+  geom_point() +
+  ggthemes::scale_color_colorblind() +
+  theme(legend.position = "bottom") +
+  coord_fixed() + 
+  facet_wrap(~motion_since_lineset)
 ```
 
 ```{r}
