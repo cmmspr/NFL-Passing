@@ -5,33 +5,58 @@ format: html
 editor: visual
 ---
 
-## *Data tidying:*
+## *NFL Passing Data:*
 
-- Join receivers with players.csv to attach player position
+- Passing data from regular season weeks 1-9 in 2022
 
-## *Question Ideas:*
+- Lacks target player position & all players' headshots
 
-- What's the most successful play on fourth down?
+## *Question Breakdown:*
 
-- Clustering yards after catch & route ran for complete passes, using location of target (x and y coordinates)
+1.  What's the most successful play on fourth down?
 
-- Which team is most successful at converting on fourth down?
+    *Variables - Total Yards, Completion Percentage, Route Ran, Huddle/No Huddle, Offense Formation, Motion Since Lineset*
+
+2.  Who were the top passing/receiving duos?
+
+    *How often were these receivers targeted by their QB?*
 
 ```{r}
-library(tidyverse)
+### Exploring Data ----------------------------------------------------------------
 
+# Loading libraries
+library(tidyverse)
+library(nflreadr)
+library(ggimage)
+library(teamcolors)
+library(sportyR)
+library(imager)
+library(patchwork)
+library(dplyr)
+
+# Inspect data
 nfl_passes <- read_csv("https://raw.githubusercontent.com/36-SURE/2026/main/data/nfl_passes.csv")
+
+head(nfl_passes)
+summary(nfl_passes)
 ```
 
 ```{r}
-# Selecting player position from dataset
-players <- players |>
-  select(displayName, Position) |>
-  arrange(displayName)
+### Data Tidying ------------------------------------------------------------------
 
-# Joins nfl_passes and players dataset to add position of target receivers
-data_set <- left_join(nfl_passes, players, by = join_by("target_player_name" == "displayName"))
+# Source player headshots and position from nflreadr package
+player_headshots <- nflreadr::load_rosters(seasons = 2022) 
+player_headshots <- player_headshots|>
+  select(position, full_name, headshot_url)
 
+# Join position and target player headshots to dataset
+df <- nfl_passes |>
+  left_join(player_headshots, by = join_by("target_player_name" == "full_name"), relationship = "many-to-many")
+
+# Generate dataframe to prepare joining headshots of quarterbacks
+quarterbacks <- player_headshots |>
+  mutate(full_name = str_replace(full_name, "^(\\w)\\w*\\s+", "\\1.")) |>
+  select(full_name, qb_headshot = headshot_url)
 ```
 
 ```{r}
@@ -46,33 +71,46 @@ nfl_passes |>
 
 ```{r}
 # Generating dataset with completed passes during fourth down routes
-route_outcomes <- data_set |>
-  filter(!is.na(Position),
-         Position %in% c("RB", "TE", "WR"),
+fourth_down_outcomes <- df |>
+  filter(!is.na(position),
+         position %in% c("RB", "TE", "WR"),
          down == "4"
          ) |>
-  group_by(route_ran, Position) |>
+  group_by(route_ran, position) |>
   summarise(avg_air_yards = mean(air_yards), avg_total_yards = mean(yards_gained), completed_pass_perc = mean(complete_pass))
 
-# Display dataset
-route_outcomes
+# Dataset sample
+head(fourth_down_outcomes)
 ```
 
 ```{r}
 # Generates graph to illustrate total yards during fourth down completions based on different routes and positions
-route_outcomes |>
+fourth_down_outcomes |>
   mutate(expected_yards = avg_total_yards * completed_pass_perc) |>
   ggplot(aes(x = route_ran, y = expected_yards)) +
   geom_col() +
-   facet_wrap(~Position) +
+   facet_wrap(~position) +
   coord_flip() 
 
+
+fourth_down_outcomes |>
+  mutate(expected_yards = avg_total_yards * completed_pass_perc) |>
+  ggplot(aes(y = route_ran, x = position)) +
+  geom_tile(aes(fill = expected_yards), color = "grey50") +
+  scale_fill_continuous() +
+  theme_classic() +
+  coord_equal()
 ```
 
 ```{r}
-library(sportyR)
+#
+summary(nfl_passes$target_x)
+summary(nfl_passes$target_y)
+
+# Constructing football field
 football_field <- geom_football(league = "NFL", display_range = "in_bounds_only", rotation = 270)
 
+# Fourth down plays
 fourth_downs <- nfl_passes |>
   filter(down == 4, !is.na(route_ran)) |>
   group_by(route_ran) |>
@@ -80,6 +118,7 @@ fourth_downs <- nfl_passes |>
   filter(attempt > 10) |>
   ungroup() 
 
+# 
 football_field + 
   geom_point(data = fourth_downs, 
              aes(x = target_y -26.65, y = target_x - 60, color = factor(complete_pass))) + 
@@ -94,78 +133,13 @@ football_field +
 ```
 
 ```{r}
-nfl_passes |>
-  group_by(posteam, route_ran) |>
-  summarise(avg_yards = mean(yards_gained)) |>
-  ggplot(aes(x = route_ran, y = avg_yards)) +
-  geom_col() +
-  facet_wrap(~posteam) +
-  coord_flip()
-
-nfl_passes |>
-  filter(posteam %in% c("KC", "CHI")) |>
-  group_by(posteam, route_ran) |>
-  summarise(avg_yards = mean(yards_gained), completed_pass_perc = mean(complete_pass), expected_yards = avg_yards * completed_pass_perc) |>
-  ggplot(aes(x = route_ran, y = expected_yards)) +
-  geom_col() +
-  facet_wrap(~posteam) +
-  coord_flip()
+# Clustering
 
 ```
 
 ```{r}
-summary(nfl_passes$target_x)
-summary(nfl_passes$target_y)
-
-```
-
-```{r}
-library(nflreadr)
-library(ggimage)
-
-player_headshots <- nflreadr::load_rosters(seasons = 2022) 
-
-player_headshots <- player_headshots|>
-  select(position, full_name, headshot_url)
-
-df <- nfl_passes |>
-  left_join(player_headshots, by = join_by("target_player_name" == "full_name"))
 
 test <- df |>
-  group_by(passer_player_name, target_player_name, receiver_headshot = headshot_url, posteam) |>
-  summarise(times_targeted = n(), 
-            total_yards = sum(yards_gained), 
-            yards_per_target = total_yards/times_targeted) |>
-  arrange(desc(total_yards)) |>
-  filter(times_targeted >= 5) |>
-  head(10)
-
-test |>
-  ggplot(aes(x = times_targeted, y = total_yards)) +
-  geom_image(aes(image = receiver_headshot), size = 0.2) 
-  # scale_y_continuous(limits = c(0, 1200))
-
-test |>
-  ggplot(aes(x = reorder(target_player_name, total_yards), y = total_yards, fill = posteam)) +
-  geom_col(width = 0.52) +
-  geom_image(aes(image = receiver_headshot), size = 0.16) +
-  coord_flip() +
-  theme_classic()
-```
-
-```{r}
-library(nflreadr)
-library(ggimage)
-library(teamcolors)
-
-player_headshots <- nflreadr::load_rosters(seasons = 2022) 
-player_headshots <- player_headshots|>
-  select(position, full_name, headshot_url)
-
-result <- nfl_passes |>
-  left_join(player_headshots, by = join_by("target_player_name" == "full_name"), relationship = "many-to-many")
-
-test <- result |>
   group_by(passer_player_name, target_player_name, receiver_headshot = headshot_url, posteam) |>
   summarise(times_targeted = n(), 
             total_yards = sum(yards_gained), 
@@ -186,11 +160,7 @@ test2 <- test |>
   coord_flip() +
   theme_classic()
 
-quarterbacks <- player_headshots |>
-  mutate(full_name = str_replace(full_name, "^(\\w)\\w*\\s+", "\\1.")) |>
-  select(full_name, qb_headshot = headshot_url)
-
-top_duos <- result |>
+top_duos <- df |>
   left_join(quarterbacks, by = join_by("passer_player_name" == "full_name"), relationship = "many-to-many") |>
   group_by(passer_player_name, 
            target_player_name, 
@@ -205,6 +175,7 @@ top_duos <- result |>
   arrange(desc(total_yards))|>
   head(10)
 
+# Team colors from top 10 duos
 teamcolors <- c(
   "LA" = "#0C2BE9",
   "MIN" = "#4f2683",
@@ -217,6 +188,14 @@ teamcolors <- c(
   "CIN" = "#fb4f14",
   "CLE" = "#7c4700",
   "LV" = "grey")
+
+duo_attempts <- df |>
+  group_by(passer_player_name) |>
+  mutate(qb_attempts = n()) |>
+  ungroup() |>
+  group_by(passer_player_name, target_player_name) |>
+  mutate(count = n()) |>
+  distinct(passer_player_name, target_player_name, count, qb_attempts)
 
 top_duos |>
   left_join(duo_attempts, by = c("passer_player_name", "target_player_name")) |>
