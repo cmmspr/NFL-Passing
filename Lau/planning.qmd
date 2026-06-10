@@ -15,11 +15,13 @@ editor: visual
 
 1.  What's the most successful play on fourth down?
 
-    *Variables - Total Yards, Completion Percentage, Route Ran, Huddle/No Huddle, Offense Formation, Motion Since Lineset, Time to Throw*
+    - *Variables - Total Yards, Completion Percentage, Route Ran, Huddle/No Huddle, Offense Formation, Motion Since Lineset, Time to Throw*
 
 2.  Who were the top passing/receiving duos?
 
-    *How often were these receivers targeted by their QB?*
+    - *How often were these receivers targeted by their QB?*
+
+    - *Variables - Total Yards (as a duo), Percent Targeted by QB, PLayer Headshots*
 
 ```{r}
 ### Exploring Data ----------------------------------------------------------------
@@ -89,7 +91,7 @@ fourth_down_outcomes |>
   mutate(expected_yards = avg_total_yards * completed_pass_perc) |>
   ggplot(aes(x = route_ran, y = expected_yards)) +
   geom_col() +
-   facet_wrap(~position) +
+  facet_wrap(~position) +
   coord_flip() 
 
 
@@ -103,14 +105,14 @@ fourth_down_outcomes |>
 ```
 
 ```{r}
-#
+# Dimensions of coordinate metrics
 summary(nfl_passes$target_x)
 summary(nfl_passes$target_y)
 
 # Constructing football field
 football_field <- geom_football(league = "NFL", display_range = "in_bounds_only", rotation = 270)
 
-# Fourth down plays
+# Fourth down plays dataset
 fourth_downs <- nfl_passes |>
   filter(down == 4, !is.na(route_ran)) |>
   group_by(route_ran) |>
@@ -118,7 +120,7 @@ fourth_downs <- nfl_passes |>
   filter(attempt > 10) |>
   ungroup() 
 
-# 
+# Field location of fourth down pass plays
 football_field + 
   geom_point(data = fourth_downs, 
              aes(x = target_y -26.65, y = target_x - 60, color = factor(complete_pass))) + 
@@ -133,7 +135,9 @@ football_field +
 ```
 
 ```{r}
-# Clustering
+### Clustering --------------------------------------------------------------------
+##  K-means
+
 fourth_down_features <- df |>
   mutate(no_huddle = as.numeric(no_huddle),
          complete_pass = as.numeric(complete_pass),
@@ -152,10 +156,8 @@ std_fourth_down_features <- fourth_down_features |>
 
 set.seed(47)
 kmeans_many_features <- fourth_down_features |> 
-  kmeans(algorithm = "Hartigan-Wong", centers = 4, nstart = 30) 
-```
+  kmeans(algorithm = "Hartigan-Wong", centers = 4, nstart = 30)
 
-```{r}
 # Clustering time_to_throw and yards_gained, standardized
 set.seed(47)
 
@@ -184,10 +186,8 @@ clean_football_features |>
 fourth_downs |>
   filter(complete_pass ==1) |>
   summarise(mean(yards_gained))
-```
 
-```{r}
-# Clustering
+# Clustering (Not standardized)
 init_kmeans <- fourth_downs |>
   filter(complete_pass == 1) |>
   select(time_to_throw, yards_gained) |>
@@ -202,12 +202,66 @@ fourth_downs |>
              color = team_clusters)) +
   geom_point() +
   ggthemes::scale_color_colorblind() +
-  theme(legend.position = "bottom") +
-  coord_fixed() + 
-  facet_wrap(~motion_since_lineset)
+  theme(legend.position = "bottom")  # + 
+# facet_wrap(~motion_since_lineset)
 ```
 
 ```{r}
+##  Hierarchical
+h_fourth_down_features <- fourth_downs |> 
+  select(air_yards, time_to_throw, no_huddle)
+
+fourth_down_mult_features <- h_fourth_down_features |> 
+  dist(method = "euclidean") 
+
+fourth_down_hc_complete <- fourth_down_mult_features |> 
+  hclust(method = "complete")
+
+fourth_downs |> 
+  mutate(
+    cluster = as.factor(cutree(fourth_down_hc_complete, k = 3))
+  ) |>
+  ggplot(aes(x = time_to_throw, y = air_yards,
+             color = cluster)) +
+  geom_point(size = 4) + 
+  ggthemes::scale_color_colorblind() +
+  theme(legend.position = "bottom") +
+  facet_wrap(~complete_pass)
+
+table("Cluster" = cutree(fourth_down_hc_complete, k = 3), "Route" = fourth_downs$route_ran) 
+```
+
+```{r}
+quarterbacks_avg <- nfl_passes |>
+  filter(complete_pass == 1) |>
+  group_by(passer_player_name) |>
+  summarize(avg_air_yards = mean(air_yards), avg_time_to_throw = mean(time_to_throw), total_attempts = n()) |>
+  filter(total_attempts > 10)
+
+qb_features <- quarterbacks_avg |>
+  select(avg_air_yards, avg_time_to_throw)
+
+qb_mult_features <- qb_features |> 
+  dist(method = "euclidean")
+
+qb_complete <- qb_mult_features |> 
+  hclust(method = "complete")
+
+quarterbacks_avg |> 
+  mutate(
+    cluster = as.factor(cutree(qb_complete, k = 3))
+  ) |>
+  ggplot(aes(x = avg_time_to_throw, y = avg_air_yards,
+             color = cluster)) +
+  geom_point(size = 4) +
+  ggthemes::scale_color_colorblind() +
+  theme(legend.position = "bottom")
+
+table("Cluster" = cutree(qb_complete, k = 3), "QB" = quarterbacks_avg$passer_player_name)
+```
+
+```{r}
+### Exploring Question 2 ----------------------------------------------------------
 
 test <- df |>
   group_by(passer_player_name, target_player_name, receiver_headshot = headshot_url, posteam) |>
