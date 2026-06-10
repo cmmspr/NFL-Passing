@@ -135,6 +135,106 @@ football_field +
 ```
 
 ```{r}
+### Exploring Question 2 ----------------------------------------------------------
+
+test <- df |>
+  group_by(passer_player_name, target_player_name, receiver_headshot = headshot_url, posteam) |>
+  summarise(times_targeted = n(), 
+            total_yards = sum(yards_gained), 
+            yards_per_target = total_yards/times_targeted, 
+            .groups = "drop") |>
+  arrange(desc(total_yards)) |>
+  filter(times_targeted >= 5) |>
+  head(10)
+
+test |>
+  ggplot(aes(x = times_targeted, y = total_yards)) +
+  geom_image(aes(image = receiver_headshot), size = 0.2) 
+
+test2 <- test |>
+  ggplot(aes(x = reorder(target_player_name, total_yards), y = total_yards, fill = posteam)) +
+  geom_col(width = 0.52) +
+  geom_image(aes(image = receiver_headshot), size = 0.16) +
+  coord_flip() +
+  theme_classic()
+
+top_duos <- df |>
+  left_join(quarterbacks, by = join_by("passer_player_name" == "full_name"), relationship = "many-to-many") |>
+  group_by(passer_player_name, 
+           target_player_name, 
+           receiver_headshot = headshot_url, 
+           qb_headshot,
+           posteam) |>
+  summarise(times_targeted = n(), 
+            total_yards = sum(yards_gained), 
+            yards_per_target = total_yards/times_targeted,
+            .groups = "drop") |>
+  distinct(passer_player_name, target_player_name, .keep_all = TRUE) |>
+  arrange(desc(total_yards))|>
+  head(10)
+
+# Team colors from top 10 duos
+teamcolors <- c(
+  "LA" = "#0C2BE9",
+  "MIN" = "#4f2683",
+  "MIA" = "#10b8bd",
+  "BUF" = "#0d48a2",
+  "KC" = "#e31837",
+  "PHI" = "#004C54",
+  "TB" = "#c60c30",
+  "JAX" = "#006778",
+  "CIN" = "#fb4f14",
+  "CLE" = "#7c4700",
+  "LV" = "grey")
+
+duo_attempts <- df |>
+  group_by(passer_player_name) |>
+  mutate(qb_attempts = n()) |>
+  ungroup() |>
+  group_by(passer_player_name, target_player_name) |>
+  mutate(count = n()) |>
+  distinct(passer_player_name, target_player_name, count, qb_attempts)
+
+top_duos |>
+  left_join(duo_attempts, by = c("passer_player_name", "target_player_name")) |>
+  mutate(percent_targeted = 100 * round(count/qb_attempts, 2),
+         target_player_name = str_replace(target_player_name, "^(\\w)\\w*\\s+", "\\1."), duo = paste(passer_player_name, target_player_name, sep = " & "), 
+         metrics = paste0(total_yards, " (", percent_targeted, "%)")) |>
+  ggplot(aes(x = reorder(duo, total_yards), 
+             y = total_yards, 
+             fill = posteam)) +
+  geom_col(width = 0.6) +
+  geom_image(aes(image = receiver_headshot), 
+             size = 0.16) +
+  geom_image(aes(y = 0, image = qb_headshot), 
+             size = 0.16) +
+  geom_text(aes(label = duo),
+            family = "mono",
+            fontface = "bold", 
+            y = 35, 
+            color = "white", 
+            hjust = 0) +
+  geom_text(aes(label = metrics),
+            family = "mono",
+            fontface = "bold",
+            color = "white",
+            hjust = 1.3) +
+  scale_y_continuous(breaks = seq(0, 1000, by = 200)) +
+  coord_flip() +
+  scale_fill_manual(values = teamcolors) +
+  labs(title = "Top Passing Duos in the NFL",
+       subtitle = "From the 2022 Season",
+       y = "Total Yards (Perc. Targeted)",
+       x = "") +
+  theme_classic() +
+  theme(legend.position = "none",
+        plot.title = element_text(size = 25, family = "mono"),
+        plot.subtitle = element_text(size = 14, family = "mono"),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank())
+```
+
+```{r}
 ### Clustering --------------------------------------------------------------------
 ##  K-means
 
@@ -257,106 +357,5 @@ quarterbacks_avg |>
   ggthemes::scale_color_colorblind() +
   theme(legend.position = "bottom")
 
-table("Cluster" = cutree(qb_complete, k = 3), "QB" = quarterbacks_avg$passer_player_name)
-```
-
-```{r}
-### Exploring Question 2 ----------------------------------------------------------
-
-test <- df |>
-  group_by(passer_player_name, target_player_name, receiver_headshot = headshot_url, posteam) |>
-  summarise(times_targeted = n(), 
-            total_yards = sum(yards_gained), 
-            yards_per_target = total_yards/times_targeted, 
-            .groups = "drop") |>
-  arrange(desc(total_yards)) |>
-  filter(times_targeted >= 5) |>
-  head(10)
-
-test |>
-  ggplot(aes(x = times_targeted, y = total_yards)) +
-  geom_image(aes(image = receiver_headshot), size = 0.2) 
-
-test2 <- test |>
-  ggplot(aes(x = reorder(target_player_name, total_yards), y = total_yards, fill = posteam)) +
-  geom_col(width = 0.52) +
-  geom_image(aes(image = receiver_headshot), size = 0.16) +
-  coord_flip() +
-  theme_classic()
-
-top_duos <- df |>
-  left_join(quarterbacks, by = join_by("passer_player_name" == "full_name"), relationship = "many-to-many") |>
-  group_by(passer_player_name, 
-           target_player_name, 
-           receiver_headshot = headshot_url, 
-           qb_headshot,
-           posteam) |>
-  summarise(times_targeted = n(), 
-            total_yards = sum(yards_gained), 
-            yards_per_target = total_yards/times_targeted,
-            .groups = "drop") |>
-  distinct(passer_player_name, target_player_name, .keep_all = TRUE) |>
-  arrange(desc(total_yards))|>
-  head(10)
-
-# Team colors from top 10 duos
-teamcolors <- c(
-  "LA" = "#0C2BE9",
-  "MIN" = "#4f2683",
-  "MIA" = "#10b8bd",
-  "BUF" = "#0d48a2",
-  "KC" = "#e31837",
-  "PHI" = "#004C54",
-  "TB" = "#c60c30",
-  "JAX" = "#006778",
-  "CIN" = "#fb4f14",
-  "CLE" = "#7c4700",
-  "LV" = "grey")
-
-duo_attempts <- df |>
-  group_by(passer_player_name) |>
-  mutate(qb_attempts = n()) |>
-  ungroup() |>
-  group_by(passer_player_name, target_player_name) |>
-  mutate(count = n()) |>
-  distinct(passer_player_name, target_player_name, count, qb_attempts)
-
-top_duos |>
-  left_join(duo_attempts, by = c("passer_player_name", "target_player_name")) |>
-  mutate(percent_targeted = 100 * round(count/qb_attempts, 2),
-         target_player_name = str_replace(target_player_name, "^(\\w)\\w*\\s+", "\\1."), duo = paste(passer_player_name, target_player_name, sep = " & "), 
-         metrics = paste0(total_yards, " (", percent_targeted, "%)")) |>
-  ggplot(aes(x = reorder(duo, total_yards), 
-             y = total_yards, 
-             fill = posteam)) +
-  geom_col(width = 0.6) +
-  geom_image(aes(image = receiver_headshot), 
-             size = 0.16) +
-  geom_image(aes(y = 0, image = qb_headshot), 
-             size = 0.16) +
-  geom_text(aes(label = duo),
-            family = "mono",
-            fontface = "bold", 
-            y = 35, 
-            color = "white", 
-            hjust = 0) +
-  geom_text(aes(label = metrics),
-            family = "mono",
-            fontface = "bold",
-            color = "white",
-            hjust = 1.3) +
-  scale_y_continuous(breaks = seq(0, 1000, by = 200)) +
-  coord_flip() +
-  scale_fill_manual(values = teamcolors) +
-  labs(title = "Top Passing Duos in the NFL",
-       subtitle = "From the 2022 Season",
-       y = "Total Yards (Perc. Targeted)",
-       x = "") +
-  theme_classic() +
-  theme(legend.position = "none",
-        plot.title = element_text(size = 25, family = "mono"),
-        plot.subtitle = element_text(size = 14, family = "mono"),
-        axis.text.y = element_blank(),
-        axis.ticks.y = element_blank())
-
+table("Cluster" = cutree(qb_complete, k = 3), "QB" = quarterbacks_avg$passer_player_name
 ```
