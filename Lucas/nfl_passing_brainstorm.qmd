@@ -15,52 +15,70 @@ Question 2.
 Top ranked passer/reciever duo
 
 ```{r}
+#load packages
+#install.packages("nflreadr")
+#install.packages("ggimage")
+#install.packages("teamcolors")
+#install.packages("nfl4th")
+#install.packages("sportyR")
+#install.packages("patchwork")
 library(tidyverse)
-
-nfl_passes <- read_csv("https://raw.githubusercontent.com/36-SURE/2026/main/data/nfl_passes.csv")
-
 library(readr)
+library(nflreadr)
+library(ggimage)
+library(teamcolors)
+library(nflverse)
+library(nflfastR)
+library("patchwork")
 
-positions <- read_csv("/Users/kendalllucas/Documents/CMSACamp/NFL-Passing/players.csv")
+
+#load the data
+nfl_passes <- read_csv("https://raw.githubusercontent.com/36-SURE/2026/main/data/nfl_passes.csv")
+positions <- nflreadr::load_rosters(seasons = 2022) 
+
+#only select position, name, and headshot_url
 positions <- positions |>
-  select(Position, displayName)
+  select(position, full_name, headshot_url)
+
+#join the given dataset with the position, name, and headshot dataset
+df <- nfl_passes |>
+  left_join(positions, by = join_by("target_player_name" == "full_name"), relationship = "many-to-many")
 
 #result <- left_join(df1, df2, by = join_by(id_left == id_right))
 
-result <- left_join(nfl_passes, positions, by = join_by("target_player_name" == "displayName"), relationship = "many-to-many")
+#result <- left_join(nfl_passes, positions, by = join_by("target_player_name" == "displayName"), relationship = "many-to-many")
 
-result |>
-  filter(down == 4 & (Position == "RB" | Position == "TE" | Position == "WR")) |>
-  group_by(Position, route_ran) |>
+
+#mess around with the data
+#fourth down completion percentage by route and position
+hello <- df |>
+  filter(down == 4 & (position == "RB" | position == "TE" | position == "WR")) |>
+  group_by(position, route_ran) |>
   summarise(completion_percentage = mean(complete_pass)) |>
   ggplot(aes(x = route_ran, y = completion_percentage)) +
   geom_col() +
-  facet_wrap(~Position) +
-  coord_flip()
+  facet_wrap(~position) +
+  theme_light() +
+  theme(axis.text.x = element_text(angle = 45,
+                                   vjust = 1, hjust = 1))
+
+
+#hello
 ```
 
 #hello
 
 ```{r}
+#
+#player_headshots <- nflreadr::load_rosters(seasons = 2022) 
+#player_headshots <- player_headshots|>
+#  select(position, full_name, headshot_url)
 
-#install.packages("nflreadr")
-install.packages("ggimage")
+#result <- nfl_passes |>
+ # left_join(player_headshots, by = join_by("target_player_name" == "full_name"), relationship = "many-to-many")
 
-library(nflreadr)
-library(ggimage)
-
-#install.packages("teamcolors")
-library(teamcolors)
-
-
-player_headshots <- nflreadr::load_rosters(seasons = 2022) 
-player_headshots <- player_headshots|>
-  select(position, full_name, headshot_url)
-
-result <- nfl_passes |>
-  left_join(player_headshots, by = join_by("target_player_name" == "full_name"), relationship = "many-to-many")
-
-test <- result |>
+#
+test <- df |>
   group_by(passer_player_name, target_player_name, receiver_headshot = headshot_url, posteam) |>
   summarise(times_targeted = n(), 
             total_yards = sum(yards_gained), 
@@ -101,10 +119,10 @@ top_duos <- result |>
   head(10)
 
 teamcolors <- c(
-  "LA" = "#0C2BE9",
+  "LA" = "#00338D",
   "MIN" = "#4f2683",
-  "MIA" = "#10b8bd",
-  "BUF" = "#0d48a2",
+  "MIA" = "#008e97",
+  "BUF" = "#00338D",
   "KC" = "#e31837",
   "PHI" = "#004C54",
   "TB" = "#c60c30",
@@ -126,7 +144,7 @@ top_duos |>
   scale_fill_manual(values = teamcolors)
 
 
-
+#hexcodes for the teams that made the top 10 so the bar color matches the team color
 teamcolors <- c(
   "LA" = "#0C2BE9",
   "MIN" = "#4f2683",
@@ -140,7 +158,9 @@ teamcolors <- c(
   "CLE" = "#7c4700",
   "LV" = "grey")
 
-result |>
+
+#bar graphs for the top duos
+df |>
   mutate(duo = paste(passer_player_name, target_player_name, sep = " & ")) |>
   group_by(duo, posteam) |>
   summarise(yards = sum(yards_gained), .groups = "drop") |>
@@ -156,6 +176,121 @@ result |>
 #Rams, Vikings, Dolphins, Bills, Cheifs, Ealges, Bucs, Jags, Bengals, Browns
 ```
 
-Reasons Kansas is Good and Chi is Bad
+```{r}
 
--   hellos
+fourth_passes <- pbp_2022 %>%
+	filter(down == 4, pass == 1, !is.na(air_yards), !is.na(pass_location))
+
+fourth_passes <- pbp_2022 %>%
+	filter(down == 4, pass == 1) %>%
+	mutate(
+		success = if_else(first_down == 1, "Success", "Failure")
+	)
+
+fourth_passes <- fourth_passes |>
+  select(success, air_yards, pass_location)
+
+fourth_passes <- na.omit(fourth_passes)
+
+ggplot(fourth_passes, aes(x = air_yards, y = pass_location, color = success)) +
+	geom_jitter(alpha = 0.7, size = 2.5, height = 0.4) +
+	scale_color_manual(values = c("Success" = "green3", "Failure" = "red3")) +
+	labs(
+		title = "4th Down Passing: Success vs Failure (2022)",
+		subtitle = "Depth of target (air_yards) vs horizontal location (left/middle/right)",
+		x = "Air Yards (Depth of Throw)",
+		y = "Pass Location",
+		color = "Outcome"
+	) +
+	theme_minimal() +
+  coord_flip() +
+  scale_x_continuous()
+
+
+result |>
+  ggplot(aes(x = target_x, y = target_y)) +
+  geom_col() +
+  facet_wrap(~Position) +
+  coord_flip()
+
+result |>
+  filter(down == 4) |>
+  mutate(success = if_else(complete_pass == 1, "Success", "Failure"))|>
+  ggplot(aes(x = target_x, y = target_y, color = success)) +
+  geom_point(size = 2, alpha = 0.3, shape = 4, stroke = 3) +
+  scale_color_manual(values = c("Success" = "green3", "Failure" = "red3")) +
+  coord_flip() +
+  labs
+```
+
+```{r}
+
+
+geom_football("nfl", display_range = "red zone")
+
+fourth_down <- df |>
+  filter(down == 4) |>
+   mutate(success = if_else(complete_pass == 1, "Complete", "Incomplete"))
+  
+titles <- c("0" = "Incomplete", "1" = "Complete")
+
+
+pass_locations <-  geom_football("nfl", x_trans = 70, y_trans = 26.65, display_range = "full", rotation = 270) +
+  geom_point(data = fourth_down, aes(x = target_y, y = -target_x, color = success), size = 2, stroke = 3, alpha = 0.5) + 
+  geom_density2d(data = fourth_down, aes(x = target_y, y = -target_x), color = "black", alpha = 0.7) +
+    geom_hline(yintercept = -120, size = 1) +
+   annotate("rect", xmin = -10, xmax = 30, ymin = -126, ymax = -120.5, fill = "white") +
+    annotate("text", x = 10, y = -122, label = "line of scrimmage", size = 3, fontface = "bold") +
+  scale_color_manual(values = c("Complete" = "green3", "Incomplete" = "red3")) +
+    labs(title = "Complete and Incomplete 4th Down Pass Locations", subtitle = "From Weeks 1-9 of the 2022 NFL Season") +
+  theme(legend.position = "none") +
+    theme(
+    plot.title = element_text(
+      family = "mono",
+      size = 13,             
+      hjust = 0            
+    ), plot.subtitle = element_text(
+      family = "mono",
+      size = 10,
+      hjust = 0),
+    legend.text = element_text(
+      family = "mono",
+      size = 9
+    )) +
+  facet_wrap(~complete_pass, labeller = as_labeller(titles))
+
+
+geom_football("nfl", x_trans = 70, y_trans = 26.65, display_range = "full", rotation = 270) +
+  geom_hex(data = fourth_down, aes(x = target_y, y = -target_x), binwidth = c(6, 6), alpha = 0.7) +
+  scale_fill_gradient(low = "black", 
+                      high = "white") + 
+  #geom_point(data = fourth_down, aes(x = target_y, y = -target_x, color = success), shape = 4, size = 2, stroke = 3, alpha = 0.5) + 
+    geom_hline(yintercept = -120, linewidth = .75) +
+    annotate("text", x = 10, y = -122, label = "line of scrimmage", size = 3, fontface = "bold") +
+  scale_color_manual(values = c("Complete" = "green3", "Incomplete" = "red3")) +
+    labs(title = "Complete and Incomplete 4th Down Pass Locations", subtitle = "From Weeks 1-9 of the 2022 NFL Season") +
+    theme(
+    plot.title = element_text(
+      family = "mono",
+      size = 13,             
+      hjust = 0            
+    ), plot.subtitle = element_text(
+      family = "mono",
+      size = 10,
+      hjust = 0),
+    legend.text = element_text(
+      family = "mono",
+      size = 9
+    )) +
+  facet_wrap(~complete_pass)
+
+
+
+pass_locations | hello
+combined
+
+pass_locations
+
+
+
+```
