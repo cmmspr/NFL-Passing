@@ -292,5 +292,11 @@ combined
 pass_locations
 
 
+df |>
+  filter(down == 4 & complete_pass == 1)|>
+  group_by(route_ran) |>
+  summarise(freq = n()) |>
+  arrange(desc(freq))
+
 
 ```
